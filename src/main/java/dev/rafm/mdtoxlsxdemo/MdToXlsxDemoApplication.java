@@ -1,13 +1,20 @@
 package dev.rafm.mdtoxlsxdemo;
 
 import java.io.BufferedReader;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Date;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class MdToXlsxDemoApplication {
 
@@ -52,13 +59,18 @@ public class MdToXlsxDemoApplication {
     }
 
     public static void main(String[] args) throws IOException {
-        Set<String> columns = new HashSet<>();
         Path mardownResourcesPath = Paths.get("aws");
-        createInitialExcel();
+
+        FileOutputStream out = new FileOutputStream(String.format("CloudSpoit-%s.xls", new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss_SSSS").format(new Date())));
+        Workbook wb = new XSSFWorkbook();
+        Sheet s = wb.createSheet();
+        wb.setSheetName(0, "CloudSpoit cloud vulnerabilities");
+        AtomicInteger rownum = new AtomicInteger();
+
+        createHeader(s.createRow(rownum.getAndIncrement()));
         Files.walk(mardownResourcesPath).forEach(path -> {
             if (Files.isRegularFile(path) && path.getFileName().toString().endsWith(".md")) {
-                String name = null;
-                String category = null;
+                Row row = s.createRow(rownum.getAndIncrement());
                 StringBuilder detail = new StringBuilder();
                 boolean readCategoryAndName = false;
 
@@ -73,9 +85,13 @@ public class MdToXlsxDemoApplication {
                         if (!readCategoryAndName) {
                             if (line.startsWith("# AWS")) {
                                 String[] categoryAndName = line.split("/");
-                                category = categoryAndName[categoryAndName.length-2];
-                                name = categoryAndName[categoryAndName.length-1];
-                                // TODO put on the xlsx
+
+                                String category = categoryAndName[categoryAndName.length-2];
+                                row.createCell(0).setCellValue(category);
+
+                                String name = categoryAndName[categoryAndName.length-1];
+                                row.createCell(1).setCellValue(name);
+
                                 readCategoryAndName = true;
                             }
                         } else if (!readInfo) {
@@ -83,11 +99,11 @@ public class MdToXlsxDemoApplication {
                                 if (!line.startsWith("|")) {
                                     readInfo = true;
                                 } else {
-                                    readInfo(line);
+                                    readInfo(line, row);
                                 }
                             } else if (line.startsWith("|")) {
                                 startedReadingInfo = true;
-                                readInfo(line);
+                                readInfo(line, row);
                             }
                         } else if (!readDetail) {
                             if (startedReadingDetail) {
@@ -102,25 +118,53 @@ public class MdToXlsxDemoApplication {
                             }
                         }
                     }
-                    // TODO put detail on excel
+                    row.createCell(6).setCellValue(detail.toString());
                     readDetail = true;
                 } catch (IOException e) {
                     System.err.println("Failure to read file: " + path.getFileName());
                 }
             }
         });
-        System.out.println(columns);
+        wb.write(out);
+        out.close();
+        wb.close();
     }
 
-    // TODO
-    private static void createInitialExcel() {
-
+    private static void createHeader(Row headerRow) {
+        int columnIndex = 0;
+        headerRow.createCell(columnIndex++).setCellValue("Category");
+        headerRow.createCell(columnIndex++).setCellValue("Name");
+        headerRow.createCell(columnIndex++).setCellValue("Description");
+        headerRow.createCell(columnIndex++).setCellValue("More Info");
+        headerRow.createCell(columnIndex++).setCellValue("AWS Link");
+        headerRow.createCell(columnIndex++).setCellValue("Recommended Action");
+        headerRow.createCell(columnIndex++).setCellValue("Detailed Remediation Steps");
     }
 
-    private static void readInfo(String line) { // TODO excel
+    private static void readInfo(String line, Row row) {
         QuickInfo quickInfo = getQuickInfo(line);
         if (quickInfo != null) {
-            // TODO switch and put to excel
+            switch (quickInfo.key) {
+                case DESCRIPTION: {
+                    row.createCell(2).setCellValue(quickInfo.value);
+                    break;
+                }
+                case MORE_INFO: {
+                    row.createCell(3).setCellValue(quickInfo.value);
+                    break;
+                }
+                case AWS_LINK: {
+                    row.createCell(4).setCellValue(quickInfo.value);
+                    break;
+                }
+                case RECOMMENDED_ACTION: {
+                    row.createCell(5).setCellValue(quickInfo.value);
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
         }
     }
 
