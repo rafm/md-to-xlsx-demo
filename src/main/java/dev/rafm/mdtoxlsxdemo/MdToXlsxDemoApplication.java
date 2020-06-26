@@ -61,7 +61,7 @@ public class MdToXlsxDemoApplication {
     public static void main(String[] args) throws IOException {
         Path mardownResourcesPath = Paths.get("aws");
 
-        FileOutputStream out = new FileOutputStream(String.format("CloudSpoit-%s.xls", new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss_SSSS").format(new Date())));
+        FileOutputStream out = new FileOutputStream(String.format("CloudSpoit-%s.xlsx", new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss_SSSS").format(new Date())));
         Workbook wb = new XSSFWorkbook();
         Sheet s = wb.createSheet();
         wb.setSheetName(0, "CloudSpoit cloud vulnerabilities");
